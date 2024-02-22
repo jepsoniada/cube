@@ -52,6 +52,8 @@ impl Corner {
     }
 }
 
+trait PieceNotation {}
+
 #[repr(usize)]
 #[derive(Debug, Copy, Clone, PartialEq)]
 enum EdgeNotation {
@@ -66,6 +68,7 @@ impl EdgeNotation {
 	*self as usize
     }
 }
+impl PieceNotation for EdgeNotation {}
 // impl Into<Edge> for EdgeNotation {
 //     fn into(self) -> Edge {
 // 	Edge(EdgeRot::Correct, self)
@@ -86,6 +89,7 @@ impl CornerNotation {
 	*self as usize
     }
 }
+impl PieceNotation for CornerNotation {}
 // impl Into<Corner> for CornerNotation {
 //     fn into(self) -> Corner {
 // 	Corner(CornerRot::YFacing, self)
@@ -113,8 +117,10 @@ enum MoveNotation {
     z, zp,
 }
 
-type CornerComutation = (CornerNotation, Option<RotDirection>);
-type EdgeComutation = (EdgeNotation, Option<RotDirection>);
+#[derive(Clone, Copy)]
+struct Comutation<XN: PieceNotation>(XN, Option<RotDirection>);
+type CornerComutation = Comutation<CornerNotation>;
+type EdgeComutation = Comutation<EdgeNotation>;
 
 #[derive(Debug, PartialEq)]
 struct Cube {
@@ -135,9 +141,8 @@ impl Cube {
     // TODO is comutator exhaustive???
     fn corner_swap_right(&mut self, a: CornerComutation, b: CornerComutation, c: CornerComutation) -> &Self {
 	vec![a, b, c].iter().for_each(|&x| {
-	    match x.1 {
-		Some(rot) => { self.corners[x.0.index()].rotate(rot); () },
-		_ => (),
+	    if let Some(rot) = x.1 {
+		self.corners[x.0.index()].rotate(rot); ()
 	    }
 	});
 	self.corners.swap(a.0.index(), c.0.index());
@@ -146,9 +151,8 @@ impl Cube {
     }
     fn corner_swap_left(&mut self, a: CornerComutation, b: CornerComutation, c: CornerComutation) -> &Self {
 	vec![a, b, c].iter().for_each(|&x| {
-	    match x.1 {
-		Some(rot) => { self.corners[x.0.index()].rotate(rot); () },
-		_ => (),
+	    if let Some(rot) = x.1 {
+		self.corners[x.0.index()].rotate(rot); ()
 	    }
 	});
 	self.corners.swap(a.0.index(), c.0.index());
@@ -157,9 +161,8 @@ impl Cube {
     }
     fn edge_swap_right(&mut self, a: EdgeComutation, b: EdgeComutation, c: EdgeComutation) -> &Self {
 	vec![a, b, c].iter().for_each(|&x| {
-	    match x.1 {
-		Some(rot) => { self.edges[x.0.index()].rotate(rot); () },
-		_ => (),
+	    if let Some(rot) = x.1 {
+		self.corners[x.0.index()].rotate(rot); ()
 	    }
 	});
 	self.edges.swap(a.0.index(), c.0.index());
@@ -168,9 +171,8 @@ impl Cube {
     }
     fn edge_swap_left(&mut self, a: EdgeComutation, b: EdgeComutation, c: EdgeComutation) -> &Self {
 	vec![a, b, c].iter().for_each(|&x| {
-	    match x.1 {
-		Some(rot) => { self.edges[x.0.index()].rotate(rot); () },
-		_ => (),
+	    if let Some(rot) = x.1 {
+		self.corners[x.0.index()].rotate(rot); ()
 	    }
 	});
 	self.edges.swap(a.0.index(), c.0.index());
@@ -189,22 +191,17 @@ fn main() {
     use CornerNotation::*;
     use EdgeNotation::*;
     use RotDirection::*;
-    // println!("{:?}", Cube::new().edge_swap_left(
-    // 	(I, None),
-    // 	(J, None),
-    // 	(K, None),
-    // ))	 ppz
     let mut cube_a = Cube::new();
     cube_a.edge_swap_left(
-	(I, None),
-	(J, None),
-	(K, None),
+	Comutation(I, None),
+	Comutation(J, None),
+	Comutation(K, None),
     );
     let mut cube_b = Cube::new();
     cube_b.edge_swap_right(
-	(K, None),
-	(J, None),
-	(I, None),
+	Comutation(K, None),
+	Comutation(J, None),
+	Comutation(I, None),
     );
     assert_eq!(cube_a, cube_b)
 }
