@@ -24,11 +24,12 @@ enum CornerRot {
 }
 impl Rotations for CornerRot {}
 
-trait Piece {}
+trait Piece {
+    fn rotate(&self, dir: RotDirection) -> Self;
+}
 #[derive(Debug, Copy, Clone, PartialEq)]
 struct Edge(EdgeRot, EdgeNotation);
-impl Piece for Edge {}
-impl Edge {
+impl Piece for Edge {
     fn rotate(&self, dir: RotDirection) -> Edge {
 	match self {
 	    Edge(EdgeRot::Correct, a) => Edge(EdgeRot::Incorrect, *a),
@@ -38,8 +39,7 @@ impl Edge {
 }
 #[derive(Debug, Copy, Clone, PartialEq)]
 struct Corner(CornerRot, CornerNotation);
-impl Piece for Corner {}
-impl Corner {
+impl Piece for Corner {
     fn rotate(&self, dir: RotDirection) -> Corner {
 	match (self, dir) {
 	    (Corner(CornerRot::YFacing, a), RotDirection::Right) => Corner(CornerRot::XFacing, *a),
@@ -52,7 +52,9 @@ impl Corner {
     }
 }
 
-trait PieceNotation {}
+trait PieceNotation {
+    fn index(&self) -> usize;
+}
 
 #[repr(usize)]
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -64,11 +66,12 @@ impl EdgeNotation {
 	use EdgeNotation::*;
 	[I, J, K, L, M, N, O, P, R, S, T, U]
     }
+}
+impl PieceNotation for EdgeNotation {
     fn index(&self) -> usize {
 	*self as usize
     }
 }
-impl PieceNotation for EdgeNotation {}
 // impl Into<Edge> for EdgeNotation {
 //     fn into(self) -> Edge {
 // 	Edge(EdgeRot::Correct, self)
@@ -85,11 +88,12 @@ impl CornerNotation {
 	use CornerNotation::*;
 	[A, B, C, D, E, F, G, H]
     }
+}
+impl PieceNotation for CornerNotation {
     fn index(&self) -> usize {
 	*self as usize
     }
 }
-impl PieceNotation for CornerNotation {}
 // impl Into<Corner> for CornerNotation {
 //     fn into(self) -> Corner {
 // 	Corner(CornerRot::YFacing, self)
@@ -182,10 +186,6 @@ impl Cube {
     // TODO
     fn r#move(&self, motion: MoveNotation) {}
 }
-
-// macro_rules! cube_from_moves {
-    
-// }
 
 fn main() {
     use CornerNotation::*;
