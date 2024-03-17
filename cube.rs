@@ -1,5 +1,10 @@
 use std::collections::HashSet;
 use std::convert::TryInto;
+use std::iter::Map;
+use serde::{Serialize, Deserialize};
+use surrealdb::Surreal;
+use surrealdb::sql::{Thing, Object};
+use surrealdb::engine::local::Mem;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 enum RotDirection {
@@ -10,13 +15,13 @@ enum RotDirection {
 trait Rotations {
     // fn rotate(A) -> A
 }
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize)]
 enum EdgeRot {
     Correct,
     Incorrect
 }
 impl Rotations for EdgeRot {}
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize)]
 enum CornerRot {
     YFacing,
     XFacing,
@@ -27,7 +32,7 @@ impl Rotations for CornerRot {}
 trait Piece {
     fn rotate(&self, dir: RotDirection) -> Self;
 }
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize)]
 struct Edge(EdgeRot, EdgeNotation);
 impl Piece for Edge {
     fn rotate(&self, dir: RotDirection) -> Edge {
@@ -37,7 +42,7 @@ impl Piece for Edge {
 	}
     }
 }
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize)]
 struct Corner(CornerRot, CornerNotation);
 impl Piece for Corner {
     fn rotate(&self, dir: RotDirection) -> Corner {
@@ -57,14 +62,14 @@ trait PieceNotation {
 }
 
 #[repr(usize)]
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize)]
 enum EdgeNotation {
-    I, J, K, L, M, N, O, P, R, S, T, U
+    I, J, K, L, M, N, O, P, Q, R, S, T
 }
 impl EdgeNotation {
     fn variants() -> [EdgeNotation; 12] {
 	use EdgeNotation::*;
-	[I, J, K, L, M, N, O, P, R, S, T, U]
+	[I, J, K, L, M, N, O, P, Q, R, S, T]
     }
 }
 impl PieceNotation for EdgeNotation {
@@ -79,7 +84,7 @@ impl PieceNotation for EdgeNotation {
 // }
 
 #[repr(usize)]
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize)]
 enum CornerNotation {
     A, B, C, D, E, F, G, H
 }
@@ -105,7 +110,7 @@ impl PieceNotation for CornerNotation {
 // }
 
 #[allow(non_camel_case_types)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Serialize)]
 enum MoveNotation {
     R, Rp, r, rp,
     U, Up, u, up,
@@ -126,7 +131,7 @@ struct Comutation<XN: PieceNotation>(XN, Option<RotDirection>);
 type CornerComutation = Comutation<CornerNotation>;
 type EdgeComutation = Comutation<EdgeNotation>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 struct Cube {
     corners: [Corner; 8],
     edges: [Edge; 12],
@@ -183,25 +188,55 @@ impl Cube {
 	self.edges.swap(a.0.index(), b.0.index());
 	&*self
     }
+    fn pair_swap(&mut self, a: CornerComutation, b: CornerComutation, c: EdgeComutation, d: EdgeComutation) -> &Self {
+	vec![a, b].iter().for_each(|&x| {
+	    if let Some(rot) = x.1 {
+		self.corners[x.0.index()].rotate(rot); ()
+	    }
+	});
+	vec![c, d].iter().for_each(|&x| {
+	    if let Some(rot) = x.1 {
+		self.edges[x.0.index()].rotate(rot); ()
+	    }
+	});
+	self.corners.swap(a.0.index(), b.0.index());
+	self.edges.swap(c.0.index(), d.0.index());
+	&*self
+    }
     // TODO
     fn r#move(&self, motion: MoveNotation) {}
 }
 
-fn main() {
+#[derive(Serialize)]
+struct TestCube<'a> {
+    corners: [&'a str; 8],
+    edges: [&'a str; 12],
+}
+
+#[derive(Deserialize)]
+struct Record {
+    id: Thing
+}
+
+#[tokio::main]
+async fn main() -> surrealdb::Result<()> {
     use CornerNotation::*;
     use EdgeNotation::*;
     use RotDirection::*;
-    let mut cube_a = Cube::new();
-    cube_a.edge_swap_left(
-	Comutation(I, None),
-	Comutation(J, None),
-	Comutation(K, None),
-    );
-    let mut cube_b = Cube::new();
-    cube_b.edge_swap_right(
-	Comutation(K, None),
-	Comutation(J, None),
-	Comutation(I, None),
-    );
-    assert_eq!(cube_a, cube_b)
+
+    let db = Surreal::new::<Mem>(()).await?;
+
+    db.use_ns("test").use_db("test").await?;
+
+    db.create::<Vec<Record>>("cube")
+	.content(Cube::new())
+	.await?;
+    
+    let res = db
+	.query("select * from cube")
+	.await?;
+    
+    print!("{res:?}");
+    
+    Ok(())
 }
